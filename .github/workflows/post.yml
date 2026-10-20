@@ -1,0 +1,38 @@
+name: Instagram 毎日投稿
+
+on:
+  schedule:
+    - cron: "0 10 * * *" # 毎日 19:00 JST（GitHub の混雑で数分〜数十分遅れることがあります）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "投稿せずに確認だけする"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency: instagram-post
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 投稿
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: python3 publish.py
+
+      - name: 投稿済みを posted/ に移動してコミット
+        run: |
+          git add -A queue posted
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "投稿済み: $(git diff --cached --name-only | grep '^posted/' | head -1 | cut -d/ -f2)"
+          git push

@@ -1,0 +1,27 @@
+name: Instagram トークン更新
+
+# 長期トークンは60日で切れるので、週1回延長する。
+# GH_PAT シークレットがあれば、新しいトークンで IG_ACCESS_TOKEN を自動で上書きする。
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 9:00 JST
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: トークン更新
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          res=$(curl -sf "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_ACCESS_TOKEN}") \
+            || { echo "トークン更新に失敗しました。トークンが期限切れの可能性があります。"; exit 1; }
+          new=$(echo "$res" | jq -r .access_token)
+          echo "::add-mask::$new"
+          echo "有効期限: $(( $(echo "$res" | jq -r .expires_in) / 86400 )) 日後"
+          if [ "$new" != "$IG_ACCESS_TOKEN" ] && [ -n "$GH_TOKEN" ]; then
+            gh secret set IG_ACCESS_TOKEN --repo "$GITHUB_REPOSITORY" --body "$new"
+            echo "IG_ACCESS_TOKEN を更新しました"
+          fi
