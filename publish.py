@@ -92,6 +92,10 @@ def publish(user_id, images, caption):
 
 
 def main():
+    if os.environ.get("DRY_RUN") == "1":
+        me = call("GET", "me", fields="user_id,username")
+        print(f"トークンOK: @{me['username']}（user_id={me['user_id']}）")
+
     found = next_post()
     if not found:
         print("queue/ に投稿がありません。今日はスキップします。")
